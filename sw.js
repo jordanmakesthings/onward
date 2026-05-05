@@ -1,4 +1,4 @@
-const CACHE = 'onward-v9';
+const CACHE = 'onward-v12';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (e) => {

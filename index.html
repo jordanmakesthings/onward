@@ -68,6 +68,13 @@
     color: var(--ink);
   }
   input:focus, select:focus, textarea:focus { outline: 1px solid var(--clay); outline-offset: 0; border-color: var(--clay); }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px var(--card-2) inset !important;
+    -webkit-text-fill-color: var(--ink) !important;
+    border-color: var(--line) !important;
+  }
   label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--mute); font-weight: 700; display: block; margin-bottom: 6px;}
 
   header {
@@ -616,6 +623,14 @@
   .auth-msg.ok { color: var(--sage) !important; }
   .auth-msg.err { color: var(--danger) !important; }
   .auth-divider { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
+  .ob-pill {
+    padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line); background: var(--card-2); color: var(--mute);
+    cursor: pointer; transition: all .15s;
+  }
+  .ob-pill.selected {
+    background: var(--clay); border-color: var(--clay); color: #fff;
+  }
   .sync-badge {
     font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--mute);
@@ -1009,22 +1024,24 @@
     <!-- Step 1: Who are you -->
     <div id="obStep1">
       <p style="color:var(--ink);font-size:15px;font-weight:600;margin-bottom:14px">Tell us about you</p>
-      <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;gap:10px">
           <div style="flex:1"><label>First name</label><input type="text" id="obFirst" placeholder="First"/></div>
           <div style="flex:1"><label>Last name</label><input type="text" id="obLast" placeholder="Last"/></div>
         </div>
-        <div><label>I'm training for</label>
-          <select id="obGoal">
-            <option value="first ultra">My first ultra</option>
-            <option value="first marathon">My first marathon</option>
-            <option value="BQ">Boston Qualifier</option>
-            <option value="100 miler">100-mile race</option>
-            <option value="200 miler">200-mile race (MOAB etc.)</option>
-            <option value="just running">Just running consistently</option>
-          </select>
+        <div>
+          <label style="margin-bottom:10px;display:block">I'm training for</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px" id="obGoalPills">
+            <button type="button" class="ob-pill" data-val="first marathon" onclick="selectPill('obGoalPills',this)">First marathon</button>
+            <button type="button" class="ob-pill" data-val="first ultra" onclick="selectPill('obGoalPills',this)">First ultra</button>
+            <button type="button" class="ob-pill" data-val="BQ" onclick="selectPill('obGoalPills',this)">Boston Qualifier</button>
+            <button type="button" class="ob-pill" data-val="100 miler" onclick="selectPill('obGoalPills',this)">100-miler</button>
+            <button type="button" class="ob-pill" data-val="200 miler" onclick="selectPill('obGoalPills',this)">200-miler</button>
+            <button type="button" class="ob-pill" data-val="just running" onclick="selectPill('obGoalPills',this)">Just running</button>
+          </div>
+          <input type="hidden" id="obGoal"/>
         </div>
-        <div><label>Current weekly km (approx)</label>
+        <div><label>Current weekly km</label>
           <input type="number" id="obWeeklyKm" placeholder="e.g. 50" inputmode="numeric"/>
         </div>
       </div>
@@ -1033,18 +1050,21 @@
 
     <!-- Step 2: Goal race -->
     <div id="obStep2" style="display:none">
-      <p style="color:var(--ink);font-size:15px;font-weight:600;margin-bottom:14px">What's your A-race?</p>
+      <p style="color:var(--ink);font-size:15px;font-weight:600;margin-bottom:4px">Your goal race</p>
+      <p style="color:var(--mute);font-size:13px;margin-bottom:14px">The race you're building toward. You can add more later.</p>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div><label>Race name</label><input type="text" id="obRaceName" placeholder="e.g. Brokeanagan Backyard Ultra"/></div>
         <div><label>Race date</label><input type="date" id="obRaceDate"/></div>
         <div><label>Distance (km)</label><input type="number" id="obRaceDist" placeholder="e.g. 42.2" inputmode="decimal"/></div>
-        <div><label>Type</label>
-          <select id="obRaceType">
-            <option value="marathon">Marathon</option>
-            <option value="ultra">Ultra</option>
-            <option value="half">Half Marathon</option>
-            <option value="trail">Trail Race</option>
-          </select>
+        <div>
+          <label style="margin-bottom:10px;display:block">Type</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px" id="obRaceTypePills">
+            <button type="button" class="ob-pill" data-val="half" onclick="selectPill('obRaceTypePills',this)">Half marathon</button>
+            <button type="button" class="ob-pill" data-val="marathon" onclick="selectPill('obRaceTypePills',this)">Marathon</button>
+            <button type="button" class="ob-pill" data-val="ultra" onclick="selectPill('obRaceTypePills',this)">Ultra</button>
+            <button type="button" class="ob-pill" data-val="trail" onclick="selectPill('obRaceTypePills',this)">Trail race</button>
+          </div>
+          <input type="hidden" id="obRaceType"/>
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:18px">
@@ -1055,15 +1075,17 @@
 
     <!-- Step 3: Fueling baseline -->
     <div id="obStep3" style="display:none">
-      <p style="color:var(--ink);font-size:15px;font-weight:600;margin-bottom:14px">Fueling approach</p>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div><label>Preferred fuel style</label>
-          <select id="obFuelStyle">
-            <option value="gels">Gels / chews (race nutrition products)</option>
-            <option value="real food">Real food (dates, rice cakes, PB&J)</option>
-            <option value="mixed">Mixed — gels + real food</option>
-            <option value="drinks">Liquid only (Tailwind, Skratch etc.)</option>
-          </select>
+      <p style="color:var(--ink);font-size:15px;font-weight:600;margin-bottom:14px">How do you fuel?</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="margin-bottom:10px;display:block">Preferred style</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px" id="obFuelStylePills">
+            <button type="button" class="ob-pill" data-val="gels" onclick="selectPill('obFuelStylePills',this)">Gels &amp; chews</button>
+            <button type="button" class="ob-pill" data-val="real food" onclick="selectPill('obFuelStylePills',this)">Real food</button>
+            <button type="button" class="ob-pill" data-val="mixed" onclick="selectPill('obFuelStylePills',this)">Mixed</button>
+            <button type="button" class="ob-pill" data-val="drinks" onclick="selectPill('obFuelStylePills',this)">Liquid only</button>
+          </div>
+          <input type="hidden" id="obFuelStyle"/>
         </div>
         <div><label>Any dietary notes (optional)</label>
           <input type="text" id="obDiet" placeholder="e.g. vegan, no gluten, dairy-free"/>
@@ -1141,9 +1163,19 @@ async function doSignUp() {
   if (!first || !last || !email || !password) { authMsg('Fill in all fields.', 'err'); return; }
   if (password.length < 8) { authMsg('Password must be at least 8 characters.', 'err'); return; }
   authMsg('Creating account…', '');
-  const { error } = await sb.auth.signUp({ email, password, options: { data: { first_name: first, last_name: last } } });
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: {
+      data: { first_name: first, last_name: last },
+      emailRedirectTo: location.origin,
+    }
+  });
   if (error) { authMsg(error.message, 'err'); }
-  else { authMsg('✓ Account created! Sign in to continue.', 'ok'); }
+  else if (data?.session) {
+    // email confirmation disabled — already signed in
+  } else {
+    authMsg('✓ Check your email to confirm your account, then sign in.', 'ok');
+  }
 }
 
 async function sendMagicLink() {
@@ -1156,6 +1188,14 @@ async function sendMagicLink() {
 }
 
 /* ---------- Onboarding ---------- */
+function selectPill(groupId, btn) {
+  document.querySelectorAll('#' + groupId + ' .ob-pill').forEach(p => p.classList.remove('selected'));
+  btn.classList.add('selected');
+  // write value to the associated hidden input (immediately after the pill group)
+  const hidden = document.getElementById(groupId).nextElementSibling;
+  if (hidden) hidden.value = btn.dataset.val;
+}
+
 function obStep(n) {
   [1,2,3].forEach(i => {
     document.getElementById('obStep'+i).style.display = i === n ? '' : 'none';
@@ -1165,7 +1205,9 @@ function obStep(n) {
 function obNext(current) {
   if (current === 1) {
     const first = document.getElementById('obFirst').value.trim();
+    const goal = document.getElementById('obGoal').value;
     if (!first) { document.getElementById('obMsg').textContent = 'Enter your first name.'; return; }
+    if (!goal) { document.getElementById('obMsg').textContent = 'Pick what you\'re training for.'; return; }
     obStep(2);
   } else if (current === 2) {
     const raceName = document.getElementById('obRaceName').value.trim();
@@ -1211,7 +1253,7 @@ async function obFinish() {
 
   document.getElementById('onboardOverlay').classList.add('hidden');
   renderAll();
-  showToast(`Welcome, ${first}! Your A-race is locked in.`);
+  showToast(`Welcome, ${first}! Your goal race is locked in.`);
 }
 
 async function checkOnboarding() {
