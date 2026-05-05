@@ -697,7 +697,7 @@
     </div>
     <input type="file" id="healthFile" accept=".json,.csv,.zip" style="display:none" />
     <p style="font-size: 12px; color: var(--mute); margin-bottom: 16px; text-align: center;">
-      Health Auto Export → save JSON → tap "Import Health"
+      Health Auto Export → Export → Save to Files → tap "Import Health" (ZIP, GPX, JSON, CSV)
     </p>
 
     <div class="section-title">History</div>
@@ -1104,6 +1104,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 /* =========================================================================
    ONWARD — multi-race training app
@@ -2181,14 +2182,28 @@ function deleteLogEntry() {
 document.getElementById('healthFile').addEventListener('change', async (ev) => {
   const f = ev.target.files[0];
   if (!f) return;
+  showToast('Importing…');
   try {
-    const text = await f.text();
     let imported = 0;
-    if (f.name.toLowerCase().endsWith('.csv')) {
-      imported = parseHealthCSV(text);
+    const name = f.name.toLowerCase();
+    if (name.endsWith('.zip')) {
+      const zip = await JSZip.loadAsync(f);
+      const gpxFiles = Object.values(zip.files).filter(zf =>
+        zf.name.toLowerCase().endsWith('.gpx') &&
+        /outdoor.run/i.test(zf.name)
+      );
+      for (const zf of gpxFiles) {
+        const xml = await zf.async('string');
+        const n = parseGPX(xml, zf.name);
+        imported += n;
+      }
+    } else if (name.endsWith('.gpx')) {
+      const xml = await f.text();
+      imported = parseGPX(xml, f.name);
+    } else if (name.endsWith('.csv')) {
+      imported = parseHealthCSV(await f.text());
     } else {
-      const data = JSON.parse(text);
-      imported = parseHealthJSON(data);
+      imported = parseHealthJSON(JSON.parse(await f.text()));
     }
     LS.set('log', log);
     renderAll();
@@ -2199,6 +2214,57 @@ document.getElementById('healthFile').addEventListener('change', async (ev) => {
   }
   ev.target.value = '';
 });
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function parseGPX(xml, filename) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const pts = Array.from(doc.querySelectorAll('trkpt'));
+  if (!pts.length) return 0;
+
+  let km = 0, elevGain = 0, prevEle = null;
+  const times = [], lats = [], lons = [];
+
+  for (const pt of pts) {
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const lon = parseFloat(pt.getAttribute('lon'));
+    const ele = parseFloat(pt.querySelector('ele')?.textContent || 0);
+    const t = pt.querySelector('time')?.textContent;
+    if (isNaN(lat) || isNaN(lon)) continue;
+    if (lats.length) km += haversineKm(lats[lats.length-1], lons[lons.length-1], lat, lon);
+    if (prevEle !== null && ele > prevEle) elevGain += (ele - prevEle);
+    prevEle = ele;
+    lats.push(lat); lons.push(lon);
+    if (t) times.push(new Date(t));
+  }
+
+  if (km < 0.5) return 0;
+  const startDt = times[0] || new Date(doc.querySelector('metadata time')?.textContent || Date.now());
+  const endDt = times[times.length-1] || startDt;
+  const min = (endDt - startDt) / 60000;
+  const date = iso(startDt);
+  const startTime = startDt.toLocaleTimeString('en-CA', {hour:'2-digit', minute:'2-digit', hour12:false});
+
+  const existing = log[date];
+  if (existing && existing.source !== 'health' && (existing.km > 0 || existing.notes)) return 0;
+  log[date] = {
+    km: round1(km),
+    min: Math.round(min),
+    hr: existing?.hr || 0,
+    rpe: existing?.rpe || 0,
+    elev: Math.round(elevGain),
+    startTime,
+    type: classifyRun(km, filename),
+    notes: existing?.notes || '',
+    source: 'health',
+  };
+  return 1;
+}
 
 function parseHealthJSON(data) {
   // Health Auto Export common shapes:
